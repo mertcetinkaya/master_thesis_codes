@@ -2,22 +2,11 @@ import cv2
 import numpy as np
 import pandas as pd 
 import matplotlib.pyplot as plt
-import tensorflow as tf
-from PIL import Image
-import os
-from skimage import exposure, feature, transform
-from keras.models import Sequential
-from keras.layers import Conv2D, MaxPool2D, Dense, Flatten, Dropout
-from keras.utils import to_categorical
-from keras.optimizers import SGD
+from skimage import transform
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LogisticRegression
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.utils import shuffle
 from sklearn.naive_bayes import GaussianNB
-from sklearn.svm import LinearSVC,SVC
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.svm import SVC
 import random
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix
@@ -27,6 +16,8 @@ random.seed(0)
 #%%
 boundaries=[]
 width_height=[]
+#function for finding rectangle borders of a character, i.e. character segmentation
+#by preprocessing from line
 def preprocessing(img,binary_thresh):
     lower_boundary=0
     original_length=img.shape[0]
@@ -44,16 +35,13 @@ def preprocessing(img,binary_thresh):
                 #upper_boundary=i+int((thresh.shape[0]-i)/2)
                 break
         
-    
     for i in range(thresh.shape[0]-1,0,-1):
         for j in range(thresh.shape[1]):
             if(thresh[i,j]==0):
                 lower_boundary=i-1
                 #lower_boundary=int(i/2)
                 break
-        
-    
-    
+            
     if(len(img.shape)==3):
         img=img[lower_boundary:upper_boundary,:,:]
         width=img.shape[1]
@@ -62,6 +50,8 @@ def preprocessing(img,binary_thresh):
         width=img.shape[1]
     return img,lower_boundary,upper_boundary,original_length,width
 
+
+#function for defining lines
 def find_borders(thresh):
     #finding horizontal borders with a trick for characters like i,ü,ğ,İ,Ü,Ğ with extension at the top
     horizontal_borders=[]
@@ -113,7 +103,7 @@ def find_borders(thresh):
                             break
     return x1,y1,x2,y2
 
-
+#function for producing classifier training data using training images
 def produce_training_data(training_image_list,alphabet,binary_thresh):
     number=0
     for training_image_number in range(len(training_image_list)):
@@ -130,9 +120,8 @@ def produce_training_data(training_image_list,alphabet,binary_thresh):
                 width_height.append([t,y-x])
                 cv2.imwrite('ocr_training/images/%d.jpg'%number,im)
                 number+=1
-   
 
-                
+#function for extra correction                
 def extra_correction(predictions,probabilities,boundaries,alphabet):
     for i in range(len(predictions)):
         if(alphabet[predictions[i]] in ['.',','] and boundaries[i][0]<=0.1*boundaries[i][2]):   
@@ -174,42 +163,15 @@ def extra_correction(predictions,probabilities,boundaries,alphabet):
         #elif(alphabet[predictions[i]] in ['ö','ü'] and boundaries[i][0]==0):
             #predictions[i]=predictions[i]-1
 
-            
+#function for transforming alphabet text to alphabet list            
 def transform_text_to_alphabet(text):
     alphabet=[]
     for i in text:
         alphabet.append(i)
     return alphabet
 
-def remove_lines(image):
-    image1=image.copy()
-    gray = cv2.cvtColor(image1,cv2.COLOR_BGR2GRAY)
-    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-    
-    # Remove horizontal
-    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1,1))
-    detected_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
-    cnts = cv2.findContours(detected_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cnts = cnts[0] if len(cnts) == 2 else cnts[1]
-    for c in cnts:
-        cv2.drawContours(image1, [c], -1, (255,255,255), 2)
-        
-        
-    # Remove vertical
-    # vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1,2))
-    # detected_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, vertical_kernel, iterations=2)
-    # cnts = cv2.findContours(detected_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    # cnts = cnts[0] if len(cnts) == 2 else cnts[1]
-    # for c in cnts:
-    #     cv2.drawContours(image, [c], -1, (255,255,255), 2)
-    
-    # Repair image
-    repair_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1,2))
-    result = 255 - cv2.morphologyEx(255 - image1, cv2.MORPH_CLOSE, repair_kernel, iterations=1)
-    
-    return result
-
-def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_image_list,blurring,line_removing=False):
+#function for optical character recognition
+def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_image_list,blurring):
     classes=[]
     for training_image_number in range(len(training_image_list)):
         for i in range(len(alphabet)):
@@ -222,10 +184,10 @@ def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_imag
     for i in range(len(classes)) :
         path="ocr_training/images/"
         image=cv2.imread(path+'%d.jpg'%number)
-        if (method!='cnn'):
-            gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
-            thresh = cv2.threshold(gray,f_binary_thresh,255,cv2.THRESH_BINARY)[1]
-            image=thresh
+        
+        gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+        thresh = cv2.threshold(gray,f_binary_thresh,255,cv2.THRESH_BINARY)[1]
+        image=thresh
         
         #image_from_array = Image.fromarray(image)
         #size_image = image_from_array.resize((30,30))
@@ -236,16 +198,12 @@ def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_imag
 
     
     x_training=np.array(data)
-    #x_training = x_training.astype('float32')/255
-    if(method!='cnn'):
-        x_training=x_training.reshape((x_training.shape[0],x_training.shape[1]*x_training.shape[2]))
+        
+    x_training=x_training.reshape((x_training.shape[0],x_training.shape[1]*x_training.shape[2]))
     labels=np.array(labels)
 
-
-    #x_training = x_training.astype('float32')/255 
     y_training=labels
       
-    #x_training, y_training = shuffle(x_training, y_training)
     indices=np.arange(len(x_training))
     x_training,x_test,y_training,y_test,idx_training,idx_test=train_test_split(x_training,y_training,indices,test_size=0.25,random_state=42)
     
@@ -253,8 +211,6 @@ def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_imag
     boundaries_training=[boundaries[i] for i in idx_training]
     width_height_training=[width_height[i] for i in idx_training]
     boundaries_test=[boundaries[i] for i in idx_test]
-    #width_height_test=[width_height[i] for i in idx_test]
-    
     
     data1=[item[0] for item in width_height_training]
     data2=[item[1] for item in width_height_training]
@@ -263,9 +219,7 @@ def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_imag
     data.boxplot(column=['width', 'height'],grid=False,figsize=(8,8))
     myfig.suptitle('width and height values')
     myfig.savefig("boxplot.jpg")
-    
-    
-    
+        
     df = pd.DataFrame(boundaries_training)
     df.columns=['first', 'second', 'length']
     df['first/second']=df['first']/df['second']
@@ -296,103 +250,39 @@ def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_imag
     plt.show()
     
 
-    
-    #Using one hote encoding for the train and validation labels
-    if(method=='cnn' or method=='ann'):
-        y_training = to_categorical(y_training, len(alphabet))
-
     millis1 = int(round(time.time() * 1000))
 
-        
-    if(method=='cnn'):
-        model = Sequential()
-        model.add(Conv2D(filters=32, kernel_size=(3,3), activation='relu',input_shape=(30,30,3)))
-        #model.add(Conv2D(filters=32, kernel_size=(3,3), activation='relu'))
-        model.add(MaxPool2D(pool_size=(2, 2)))
-        model.add(Dropout(0.25))
-
-        #model.add(Conv2D(filters=64, kernel_size=(3, 3), activation='relu'))
-        #model.add(Conv2D(filters=64, kernel_size=(3, 3), activation='relu'))
-        #model.add(MaxPool2D(pool_size=(2, 2)))
-        #model.add(Dropout(0.25))
-
-        model.add(Flatten())
-        model.add(Dense(128, activation='relu'))
-        model.add(Dropout(0.25))
-        model.add(Dense(len(alphabet), activation='softmax'))
-
-
-        #Compilation of the model
-
-        #lr = 0.01
-        #sgd = SGD(lr=lr, decay=1e-6, momentum=0.9, nesterov=True)
-        model.compile(loss='categorical_crossentropy',optimizer='adam',metrics=['accuracy'])
-        model.fit(x_training, y_training, epochs=50)
-
-        
-        
-    elif(method=='ann'):
-        model = Sequential()
-        model.add(Dense(300, input_dim=x_training.shape[1], activation='relu'))
-        model.add(Dense(150, activation='relu'))
-        model.add(Dense(100, activation='relu'))
-        model.add(Dense(len(alphabet), activation='softmax'))
-        model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-        model.fit(x_training, y_training, epochs=300)
-
-        
-    elif(method=='lr'):
+    if(method=='lr'):
         model = LogisticRegression(random_state = 42).fit(x_training, y_training)
         
-    elif(method=='knn'):
-        #from sklearn.neighbors import NeighborhoodComponentsAnalysis
-        #nca = NeighborhoodComponentsAnalysis(n_components = 2, random_state = 42)
-        #nca.fit(x_training, y_training)
-        #x_training = nca.transform(x_training)
-        model = KNeighborsClassifier().fit(x_training, y_training)
         
     elif(method=='nb'):
         model= GaussianNB().fit(x_training, y_training)
 
     elif(method=='svm'):
         model= SVC(kernel='linear',probability=True,random_state = 42).fit(x_training, y_training)
-        #model= LinearSVC().fit(x_training, y_training)
-
-    elif(method=='rf'):
-        model= RandomForestClassifier().fit(x_training, y_training)
-
+        
         
     millis2 = int(round(time.time() * 1000))
     print('Training time in second: ',(millis2-millis1)/1000)
     
     
-    if(method in ['cnn','ann']):
-        y_pred=model.predict_classes(x_test)
-        y_prob=model.predict_proba(x_test)
-        y_pred_training=model.predict_classes(x_training)
-        y_prob_training=model.predict_proba(x_training)
-    elif(method in ['lr','nb','svm','rf','knn']):
+
+    if(method in ['lr','nb','svm']):
         y_pred=model.predict(x_test)
         y_prob=model.predict_proba(x_test)
         y_pred_training=model.predict(x_training)
         y_prob_training=model.predict_proba(x_training)
-    # elif(method=='knn'):
-    #     x_test = nca.transform(x_test)
-    #     y_pred=model.predict(x_test)
-    #     y_prob=model.predict_proba(x_test)
-    #     y_pred_training=model.predict(x_training)
-    #     y_prob_training=model.predict_proba(x_training)
+
     
-    if(method in ['cnn','ann']):
-        print('Training accuracy before extra correction: ',accuracy_score(np.argmax(y_training,axis=1),y_pred_training))
-    else:
-        print('Training accuracy before extra correction: ',accuracy_score(y_training,y_pred_training))
+
+    print('Training accuracy before extra correction: ',accuracy_score(y_training,y_pred_training))
     print('Test accuracy before extra correction: ',accuracy_score(y_test,y_pred))
         
     plt.figure(figsize=(45,40)) 
     plt.title('Confusion Matrix for Test Data')
     cm=confusion_matrix(y_test, y_pred)
-    sns.set(font_scale=1.25)
+    #sns.set(font_scale=1.25)
     sns.heatmap(cm,xticklabels=transform_text_to_alphabet(alphabet),yticklabels=transform_text_to_alphabet(alphabet),annot=True)
     
     plt.xticks(rotation=0) 
@@ -404,10 +294,8 @@ def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_imag
     extra_correction(predictions=y_pred,probabilities=y_prob,boundaries=boundaries_test,alphabet=alphabet)
     extra_correction(predictions=y_pred_training,probabilities=y_prob_training,boundaries=boundaries_training,alphabet=alphabet)
     
-    if(method in ['cnn','ann']):
-        print('Training accuracy after extra correction: ',accuracy_score(np.argmax(y_training,axis=1),y_pred_training))
-    else:
-        print('Training accuracy after extra correction: ',accuracy_score(y_training,y_pred_training))
+
+    print('Training accuracy after extra correction: ',accuracy_score(y_training,y_pred_training))
     print('Test accuracy after extra correction: ',accuracy_score(y_test,y_pred))
     
     plt.figure(figsize=(45,40)) 
@@ -421,18 +309,13 @@ def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_imag
     plt.savefig('cm_after_corr.jpg')
     plt.show()
     
-    
-    
     #test
     img_orig=test_image
-    if(line_removing==False):
-        img=cv2.medianBlur(img_orig,blurring)
-        cv2.imshow('blur', cv2.resize(img,(int(img.shape[1]/2),int(img.shape[0]/2))))
-        cv2.imwrite('blur.jpg', cv2.resize(img,(int(img.shape[1]/1),int(img.shape[0]/1))))
-        gray = cv2.cvtColor(img_orig,cv2.COLOR_BGR2GRAY)
-    else:
-        img=cv2.medianBlur(remove_lines(img_orig),blurring)
-        gray = cv2.cvtColor(remove_lines(img_orig),cv2.COLOR_BGR2GRAY)
+    img=cv2.medianBlur(img_orig,blurring)
+    cv2.imshow('blur', cv2.resize(img,(int(img.shape[1]/2),int(img.shape[0]/2))))
+    cv2.imwrite('blur.jpg', cv2.resize(img,(int(img.shape[1]/1),int(img.shape[0]/1))))
+    gray = cv2.cvtColor(img_orig,cv2.COLOR_BGR2GRAY)
+
     
     thresh = cv2.threshold(gray,s_binary_thresh,255,cv2.THRESH_BINARY)[1]
     cv2.imshow('thresh', cv2.resize(thresh,(int(thresh.shape[1]/2),int(thresh.shape[0]/2))))
@@ -441,9 +324,6 @@ def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_imag
 
     x1,y1,x2,y2=find_borders(thresh)
 
-              
-
-    
     #segmentation
     data=[]
     lower_b=[]
@@ -451,25 +331,14 @@ def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_imag
     original_l=[]
     boundaries_test=[]
     for i in range(len(x1)):
-        if(method=='cnn'):
-            #im=img[y1[i]:y2[i],x1[i]:x2[i],0:3]
-            im,a,b,c=preprocessing(img[y1[i]:y2[i],x1[i]:x2[i],0:3],s_binary_thresh)[0:4]
-            boundaries_test.append([a,b,c])
-            lower_b.append(a)
-            upper_b.append(b)
-            original_l.append(c)
-            cv2.imwrite('ocr_character/%d.jpg'%i,im)
-        else:
-            #cv2.imshow('thresh', cv2.resize(thresh,(int(thresh.shape[1]/2),int(thresh.shape[0]/2))))
-            #cv2.imwrite('thresh.jpg', cv2.resize(thresh,(int(thresh.shape[1]/1),int(thresh.shape[0]/1))))
-            thresh=thresh.reshape(thresh.shape[0],thresh.shape[1],1)
-            #im=thresh[y1[i]:y2[i],x1[i]:x2[i],0]
-            im,a,b,c=preprocessing(thresh[y1[i]:y2[i],x1[i]:x2[i],0],s_binary_thresh)[0:4]
-            boundaries_test.append([a,b,c])
-            lower_b.append(a)
-            upper_b.append(b)
-            original_l.append(c)
-            cv2.imwrite('ocr_character/%d.jpg'%i,im)
+
+        thresh=thresh.reshape(thresh.shape[0],thresh.shape[1],1)
+        im,a,b,c=preprocessing(thresh[y1[i]:y2[i],x1[i]:x2[i],0],s_binary_thresh)[0:4]
+        boundaries_test.append([a,b,c])
+        lower_b.append(a)
+        upper_b.append(b)
+        original_l.append(c)
+        cv2.imwrite('ocr_character/%d.jpg'%i,im)
             
         #image_from_array = Image.fromarray(im)
         #size_image = image_from_array.resize((30,30))
@@ -480,14 +349,9 @@ def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_imag
         
 
     data=np.array(data)
-    #data = data.astype('float32')/255
-    if(method!='cnn'):
-        data=data.reshape((data.shape[0],data.shape[1]*data.shape[2]))
-        #if(method=='knn'):
-            #data=nca.transform(data)
-
-        
-        
+    
+    data=data.reshape((data.shape[0],data.shape[1]*data.shape[2]))
+       
     #data=data.reshape((data.shape[0],data.shape[1],data.shape[2],1))
     #img_orig=cv2.resize(img_orig,(int(img_orig.shape[1]/2),int(img_orig.shape[0]/2)))
     #img_orig=cv2.resize(img_orig,(int(img_orig.shape[1]/1),int(img_orig.shape[0]/1)))
@@ -495,19 +359,8 @@ def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_imag
     cv2.imwrite('segmentation.jpg',cv2.resize(img_orig,(int(img_orig.shape[1]/1),int(img_orig.shape[0]/1))))
     img_orig=cv2.resize(img_orig,(int(img_orig.shape[1]/2),int(img_orig.shape[0]/2)))
     
-    
-    if(method=='cnn' or method=='ann'):
-        #predictions=model.predict_classes(data)
-        #probabilities=model.predict_proba(data)
-        y_pred=model.predict_classes(data)
-        y_prob=model.predict_proba(data)
-        
-        
-    else:
-        #predictions=model.predict(data)
-        #probabilities=model.predict_proba(data)
-        y_pred=model.predict(data)
-        y_prob=model.predict_proba(data)
+    y_pred=model.predict(data)
+    y_prob=model.predict_proba(data)
     text=''
     j=0
     
@@ -533,9 +386,8 @@ def ocr(method,alphabet,test_image,f_binary_thresh,s_binary_thresh,training_imag
     
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-    
 
-        
+#function for salt pepper noise           
 def sp_noise(image,prob):
     output = np.zeros(image.shape,np.uint8)
     for i in range(image.shape[0]):
@@ -548,5 +400,3 @@ def sp_noise(image,prob):
             else:
                 output[i][j] = image[i][j]
     return output      
-    
-    

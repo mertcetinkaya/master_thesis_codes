@@ -2,40 +2,26 @@ import numpy as np
 from os import listdir,makedirs
 from os.path import isfile, join, exists
 import cv2
-from skimage import exposure, feature, transform
+from skimage import transform
 import matplotlib.pyplot as plt
 import time
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score
 from sklearn.naive_bayes import GaussianNB
-from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import LinearSVC
-import numpy as np 
-import pandas as pd 
-import matplotlib.pyplot as plt
-import tensorflow as tf
-import cv2
-from PIL import Image
 import os
-from skimage import exposure, feature, transform
 from keras.models import Sequential
-from keras.layers import Conv2D, MaxPool2D, Dense, Flatten, Dropout,MaxPooling2D
+from keras.layers import Dense
 from keras.utils import to_categorical
-from keras.optimizers import SGD
-import time
-from sklearn.metrics import accuracy_score
-import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score,f1_score, precision_score, recall_score, confusion_matrix,fbeta_score
+from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix,fbeta_score
 import seaborn as sns
 import general_lib
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_recall_curve
 from keras.callbacks import ModelCheckpoint
-from keras.models import load_model
 
+#hog feature data production funciton
 
 def produce_data(ppcs,edge_length,medical_image_directory,total_class_number,training_or_test):
     TOTAL_CLASS_NUMBER=total_class_number
@@ -88,7 +74,7 @@ def produce_data(ppcs,edge_length,medical_image_directory,total_class_number,tra
         np.save(saving_path,hogFeature)
 
 
-        
+#hog feature training and test function      
 def function(method_name,ppcs,total_class_number,alpha_or_c,medical_image_directory):
     if(alpha_or_c==None):
         alpha_or_c=1
@@ -181,20 +167,12 @@ def function(method_name,ppcs,total_class_number,alpha_or_c,medical_image_direct
         prediction_time_list.append((millis2-millis1)/1000)
         
         
-        
-        
-        #millis2 = int(round(time.time() * 1000))
-        #print('Training time in ms: ',(millis2-millis1)/1000)
-        #training_time_list.append((millis2-millis1)/1000)
+
         training_accuracy = accuracy_score(training_pred,training_real)
-        #training_pred=clf.predict(x_training)
-        #training_real=y_training
-        #print('Training accuracy {}'.format(a))
+
         training_acc_list.append(training_accuracy)
         test_accuracy = accuracy_score(test_pred,test_real)
-        #test_pred=clf.predict(x_test)
-        #test_real=y_test
-        #print('Test accuracy {}'.format(a))
+
         test_acc_list.append(test_accuracy)
         
         training_correct_number=total_class_number*[0]
@@ -246,7 +224,6 @@ def function(method_name,ppcs,total_class_number,alpha_or_c,medical_image_direct
         test_total=test_total.reshape((-1,1))
         test_correct_rate=np.array(test_correct_rate)
         test_correct_rate=test_correct_rate.reshape((-1,1))
-        import pandas as pd
         print('accuracy by class')
         df = pd.DataFrame(data=np.concatenate([training_correct_number,training_false_number,training_total,
                                                training_correct_rate,test_correct_number,test_false_number,
@@ -318,8 +295,9 @@ def function(method_name,ppcs,total_class_number,alpha_or_c,medical_image_direct
     plt.title('training and prediction time in second for each ppc')
     plt.legend(['Training', 'Prediction'], loc='upper right')
     plt.show()
-    
-def read_data(medical_image_directory,edge_length,downsampling=True,transfer_learning=False,LSTM=False):
+
+#image data reading function
+def read_data(medical_image_directory,downsampling=True):
     data=[]
     labels=[]
 
@@ -328,8 +306,6 @@ def read_data(medical_image_directory,edge_length,downsampling=True,transfer_lea
         Class=os.listdir(path)
         for a in Class:
             image=cv2.imread(path+a)
-            image=cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            image=cv2.resize(image, (edge_length, edge_length))
             data.append(np.array(image))
             labels.append(i)
             
@@ -337,7 +313,6 @@ def read_data(medical_image_directory,edge_length,downsampling=True,transfer_lea
     labels=np.array(labels)
 
 
-    #x_training = x_training.astype('float32')/255 
     y_training=labels
     
     validation_size=0.25
@@ -378,22 +353,14 @@ def read_data(medical_image_directory,edge_length,downsampling=True,transfer_lea
 
     for f in labels:
         image=cv2.imread(medical_image_directory+'/'+f)
-        image=cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        image=cv2.resize(image, (edge_length, edge_length))
         data.append(np.array(image))
 
     x_test=np.array(data)
-    #x_test = x_test.astype('float32')/255 
 
-    #x_test=np.array(data)
-    #x_test = x_test.astype('float32')/255 
-    if(LSTM==True):
-        x_training=x_training.reshape((x_training.shape[0],1,x_training.shape[1],x_training.shape[2],x_training.shape[3]))
-        x_val=x_val.reshape((x_val.shape[0],1,x_val.shape[1],x_val.shape[2],x_val.shape[3]))
-        x_test=x_test.reshape((x_test.shape[0],1,x_test.shape[1],x_test.shape[2],x_test.shape[3]))
     return (x_training,x_val,x_test,y_training,y_val,y_test)
 
-def cnn_produce_data(medical_image_directory,edge_length,downsampling=True,transfer_learning=False,LSTM=False,data_augmentation=False):
+#data production function for cnn
+def cnn_produce_data(medical_image_directory,edge_length,downsampling=True):
     data=[]
     labels=[]
 
@@ -404,28 +371,13 @@ def cnn_produce_data(medical_image_directory,edge_length,downsampling=True,trans
         for a in Class:
             image=cv2.imread(path+a)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            #image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            #image=image.reshape(image.shape[0],image.shape[1],1)
-            #image=preprocess_img(image,edge_length)
             image=transform.resize(image, (edge_length, edge_length))
-            #image = exposure.equalize_adapthist(image, clip_limit=0.1)
-            #image/=255
-            #image = cv2.resize(image, (edge_length, edge_length))
-            #image=image/255
-            #image = img_to_array(image)
-            #image = exposure.equalize_adapthist(image, clip_limit=0.1)
-            #image=image.reshape((edge_length,edge_length,3))
-            #image_from_array = Image.fromarray(image, 'RGB')
-            #size_image = image_from_array.resize((edge_length, edge_length))
             data.append(np.array(image))
             labels.append(i)
             
 
-
-
     x_training=np.array(data)
     labels=np.array(labels)
-    #x_training = x_training.astype('float32')/255 
     y_training=labels
     
       
@@ -471,19 +423,12 @@ def cnn_produce_data(medical_image_directory,edge_length,downsampling=True,trans
         data.append(np.array(image))
 
     x_test=np.array(data)
-    #x_test = x_test.astype('float32')/255 
 
-    #x_test=np.array(data)
-    #x_test = x_test.astype('float32')/255 
-    if(LSTM==True):
-        x_training=x_training.reshape((x_training.shape[0],1,x_training.shape[1],x_training.shape[2],x_training.shape[3]))
-        x_val=x_val.reshape((x_val.shape[0],1,x_val.shape[1],x_val.shape[2],x_val.shape[3]))
-        x_test=x_test.reshape((x_test.shape[0],1,x_test.shape[1],x_test.shape[2],x_test.shape[3]))
     return (x_training,x_val,x_test,y_training,y_val,y_test)
 
 
-
-def cnn_produce_data_augmentation(medical_image_directory,edge_length,downsampling=True,transfer_learning=False,LSTM=False):
+#data production with data augmentation function for cnn 
+def cnn_produce_data_augmentation(medical_image_directory,edge_length,downsampling=True):
     data=[]
     labels=[]
 
@@ -494,31 +439,13 @@ def cnn_produce_data_augmentation(medical_image_directory,edge_length,downsampli
         for a in Class:
             image=cv2.imread(path+a)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            #image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            #image=image.reshape(image.shape[0],image.shape[1],1)
-            #image=preprocess_img(image,edge_length)
-            #image=transform.resize(image, (edge_length, edge_length))
-            #image = exposure.equalize_adapthist(image, clip_limit=0.1)
-            #image/=255
-            #image = cv2.resize(image, (edge_length, edge_length))
-            #image=image/255
-            #image = img_to_array(image)
-            #image = exposure.equalize_adapthist(image, clip_limit=0.1)
-            #image=image.reshape((edge_length,edge_length,3))
-            #image_from_array = Image.fromarray(image, 'RGB')
-            #size_image = image_from_array.resize((edge_length, edge_length))
             data.append(np.array(image))
             labels.append(i)
             
 
-
-
     x_training=np.array(data)
     labels=np.array(labels)
-    #x_training = x_training.astype('float32')/255 
     y_training=labels
-    
-        
     
     validation_size=0.25
     if(validation_size<1):
@@ -566,13 +493,6 @@ def cnn_produce_data_augmentation(medical_image_directory,edge_length,downsampli
         image=x_val[i].copy()
         x_val[i]=transform.resize(image, (edge_length, edge_length))
     x_val=np.array(x_val)
-        
-    
-    
-    
-    
-
-
 
     #Using one hote encoding for the train and validation labels
     y_training = to_categorical(y_training, 2)
@@ -593,17 +513,9 @@ def cnn_produce_data_augmentation(medical_image_directory,edge_length,downsampli
         data.append(np.array(image))
 
     x_test=np.array(data)
-    #x_test = x_test.astype('float32')/255 
-
-    #x_test=np.array(data)
-    #x_test = x_test.astype('float32')/255 
-    if(LSTM==True):
-        x_training=x_training.reshape((x_training.shape[0],1,x_training.shape[1],x_training.shape[2],x_training.shape[3]))
-        x_val=x_val.reshape((x_val.shape[0],1,x_val.shape[1],x_val.shape[2],x_val.shape[3]))
-        x_test=x_test.reshape((x_test.shape[0],1,x_test.shape[1],x_test.shape[2],x_test.shape[3]))
     return (x_training,x_val,x_test,y_training,y_val,y_test)
 
-
+#cnn probability threshold moving function
 def cnn_probability_moving(model,training_val_test_data,medical_image_directory):
     x_training,x_val,x_test,y_training,y_val,y_test=training_val_test_data[0],training_val_test_data[1],training_val_test_data[2],training_val_test_data[3],training_val_test_data[4],training_val_test_data[5]
     y_training=np.argmax(y_training,axis=1)
@@ -616,8 +528,6 @@ def cnn_probability_moving(model,training_val_test_data,medical_image_directory)
     ix = np.argmax(fbeta)
     thresh=thresholds[ix]
     print('The Best Threshold= ', thresh)
-    #no_skill = len(y_training[y_training==1]) / len(y_training)
-    #plt.plot([0,1], [no_skill,no_skill], linestyle='--', label='No Skill')
     plt.plot(recall, precision, marker='.', label='results',zorder=1)
     plt.scatter(recall[ix], precision[ix], marker='o', color='black', label='Best',zorder=2)
     # axis labels
@@ -627,9 +537,7 @@ def cnn_probability_moving(model,training_val_test_data,medical_image_directory)
     # show the plot
     plt.savefig(medical_image_directory+'/pr_re_curve.jpg')
     plt.show()
-    #a=precision_score(y_training,np.where(model.predict_proba(x_training)[:,1] > thresholds[ix],1,0))
-    #b=recall_score(y_training,np.where(model.predict_proba(x_training)[:,1] > thresholds[ix],1,0))
-    #fbeta = ((1+beta*beta) * a * b) / ((beta*beta)*a + b)
+
     print('Training precision: ',precision_score(y_training,np.where(model.predict_proba(x_training)[:,1] > thresh,1,0)))
     print('Training recall: ',recall_score(y_training,np.where(model.predict_proba(x_training)[:,1] > thresh,1,0)))
     print('Training fbeta: ',fbeta_score(y_training,np.where(model.predict_proba(x_training)[:,1] > thresh,1,0),beta=2))
@@ -644,16 +552,11 @@ def cnn_probability_moving(model,training_val_test_data,medical_image_directory)
     print('Test recall: ',recall_score(y_test,np.where(model.predict_proba(x_test)[:,1] > thresh,1,0)))
     print('Test fbeta: ',fbeta_score(y_test,np.where(model.predict_proba(x_test)[:,1] > thresh,1,0),beta=2))
     print('Test accuracy: ',accuracy_score(y_test,np.where(model.predict_proba(x_test)[:,1] > thresh,1,0)))
-    #print('Training precision: ',precision_score(y_training,np.where(model.predict_proba(x_training)[:,1] > thresholds[ix],1,0)))
     
     
 
-
-def cnn(model,edge_length,epochs,medical_image_directory,model_number,class_weight,health_threshold,transfer_learning=False,training_val_test_data=None,checkpoint=False):
-    # Reading the input images and putting them into a numpy array
-    #data=[]
-    #labels=[]
-    
+#training and test function for cnn
+def cnn(model,edge_length,epochs,medical_image_directory,model_number,class_weight,health_threshold,training_val_test_data=None,checkpoint=False):
     
     total_class_number = 2
     print('CNN')
@@ -662,52 +565,7 @@ def cnn(model,edge_length,epochs,medical_image_directory,model_number,class_weig
     else:
         x_training,x_val,x_test,y_training,y_val,y_test=training_val_test_data[0],training_val_test_data[1],training_val_test_data[2],training_val_test_data[3],training_val_test_data[4],training_val_test_data[5]
 
-
-#    for i in range(total_class_number) :
-#        path=medical_image_directory+'/binary_images/training_all/{}/'.format(i)
-#        Class=os.listdir(path)
-#        for a in Class:
-#            image=cv2.imread(path+a)
-#            image_from_array = Image.fromarray(image, 'RGB')
-#            size_image = image_from_array.resize((edge_length, edge_length))
-#            data.append(np.array(size_image))
-#            labels.append(i)
-#            
-#    
-#    if(downsampling==True):      
-#        indices0 = [i for i, x in enumerate(labels) if x == 0]
-#        indices1 = [i for i, x in enumerate(labels) if x == 1]
-#        from random import sample
-#        indices0=sample(indices0,len(indices1))
-#        indices=indices0+indices1
-#        new_data=[]
-#        for i in indices:
-#            new_data.append(data[i])
-#        new_labels=[]
-#        for i in indices:
-#            new_labels.append(labels[i])
-#        data=new_data
-#        labels=new_labels
-#
-#
-#    x_training=np.array(data)
-#    labels=np.array(labels)
-#
-#
-#    x_training = x_training.astype('float32')/255 
-#    y_training=labels
-#    
-#    if(training_size<1):
-#        x_training, a, y_training, b= train_test_split(x_training,y_training
-#                                                       ,stratify=y_training,test_size=1-training_size)
-#        del a
-#        del b
-#
-#    #Using one hote encoding for the train and validation labels
-#    y_training = to_categorical(y_training, total_class_number)
-    
-    
-    
+   
     
     millis1 = int(round(time.time() * 1000))
     if(checkpoint==True):
@@ -719,10 +577,8 @@ def cnn(model,edge_length,epochs,medical_image_directory,model_number,class_weig
         history = model.fit(x_training, y_training, batch_size=32, epochs=epochs,validation_data=(x_val, y_val),callbacks=callbacks_list)
         #history = model.fit(x_training, y_training, batch_size=32, epochs=epochs,validation_data=(x_training, y_training),callbacks=callbacks_list)
     else:
-        #history = model.fit(x_training, y_training, batch_size=32, epochs=epochs,validation_data=(x_val, y_val))
-        history = model.fit(x_training, y_training, batch_size=32, epochs=epochs,validation_data=(x_training, y_training),callbacks=callbacks_list)
-        
-        
+        history = model.fit(x_training, y_training, batch_size=32, epochs=epochs,validation_data=(x_val, y_val))
+        #history = model.fit(x_training, y_training, batch_size=32, epochs=epochs,validation_data=(x_training, y_training),callbacks=callbacks_list)
         #model = load_model(filepath)
     millis2 = int(round(time.time() * 1000))
     print('Training time in second: ',(millis2-millis1)/1000)
@@ -748,35 +604,12 @@ def cnn(model,edge_length,epochs,medical_image_directory,model_number,class_weig
     
     y_training_decoded=np.array(y_training_decoded)
     y_val_decoded=np.array(y_val_decoded)
-#    y_test=pd.read_csv(medical_image_directory+"/Test_All.csv")
-#    labels=y_test['Path'].as_matrix()
-#    y_test=y_test['ClassId'].values
-#    
-#
-#    data=[]
-#    
-#    for f in labels:
-#        image=cv2.imread(medical_image_directory+'/'+f)
-#        image_from_array = Image.fromarray(image, 'RGB')
-#        size_image = image_from_array.resize((edge_length, edge_length))
-#        data.append(np.array(size_image))
-#
-#    x_test=np.array(data)
-#    x_test = x_test.astype('float32')/255 
-
-
-
     millis1 = int(round(time.time() * 1000))
-    if(transfer_learning==False):
-        #y_training_predicted=np.where(model.predict_proba(x_training)[:,0] > health_threshold,0,1)
-        y_training_predicted=model.predict_classes(x_training)
-        y_val_predicted=model.predict_classes(x_val)
-        #y_test_predicted = np.where(model.predict_proba(x_test)[:,0] > health_threshold,0,1)
-        y_test_predicted=model.predict_classes(x_test)
-    else:
-        y_training_predicted=np.where(model.predict(x_training)[:,0] > health_threshold,0,1)
-        y_val_predicted=np.argmax(model.predict(x_val),axis=1)
-        y_test_predicted = np.where(model.predict(x_test)[:,0] > health_threshold,0,1)
+    
+    y_training_predicted=model.predict_classes(x_training)
+    y_val_predicted=model.predict_classes(x_val)
+    y_test_predicted=model.predict_classes(x_test)
+
     
     
     
@@ -975,20 +808,4 @@ def cnn(model,edge_length,epochs,medical_image_directory,model_number,class_weig
     
     return accuracy_score(y_training_decoded, y_training_predicted), accuracy_score(y_val_decoded, y_val_predicted), accuracy_score(y_test, y_test_predicted), model
     
-
-
-def image_colorfulness(image):
-	# split the image into its respective RGB components
-	(B, G, R) = cv2.split(image.astype("float"))
-	# compute rg = R - G
-	rg = np.absolute(R - G)
-	# compute yb = 0.5 * (R + G) - B
-	yb = np.absolute(0.5 * (R + G) - B)
-	# compute the mean and standard deviation of both `rg` and `yb`
-	(rbMean, rbStd) = (np.mean(rg), np.std(rg))
-	(ybMean, ybStd) = (np.mean(yb), np.std(yb))
-	# combine the mean and standard deviations
-	stdRoot = np.sqrt((rbStd ** 2) + (ybStd ** 2))
-	meanRoot = np.sqrt((rbMean ** 2) + (ybMean ** 2))
-	# derive the "colorfulness" metric and return it
-	return stdRoot + (0.3 * meanRoot)       
+   

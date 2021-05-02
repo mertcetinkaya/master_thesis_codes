@@ -2,49 +2,24 @@ import numpy as np
 from os import listdir,makedirs
 from os.path import isfile, join, exists
 import cv2
-from skimage import exposure, feature, transform
+from skimage import transform
 import matplotlib.pyplot as plt
 import time
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score
 from sklearn.naive_bayes import GaussianNB
-from sklearn.naive_bayes import MultinomialNB
 from sklearn.svm import LinearSVC
-import numpy as np 
-import pandas as pd 
-import matplotlib.pyplot as plt
-import tensorflow as tf
-import cv2
-from PIL import Image
 import os
-from skimage import exposure, feature, transform
 from keras.models import Sequential
-from keras.layers import Conv2D, MaxPool2D, Dense, Flatten, Dropout
+from keras.layers import Dense
 from keras.utils import to_categorical
-from keras.optimizers import SGD
-import time
-from sklearn.metrics import accuracy_score, confusion_matrix
-import pandas as pd
-import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
 import general_lib
-from skimage import color, exposure, transform
 import seaborn as sns
 from sklearn.model_selection import train_test_split
-from keras.preprocessing.image import ImageDataGenerator
-from keras.preprocessing.image import img_to_array
 
-def get_roi(traffic_sign_directory,train_or_test):
-    frame=pd.read_csv(traffic_sign_directory+'/'+train_or_test+'.csv')
-    for i in range(len(frame)):
-        path=traffic_sign_directory+'/'+frame['Path'][i]
-        x=cv2.imread(path)
-        x=x[frame['Roi.Y1'][i]:frame['Roi.Y2'][i],frame['Roi.X1'][i]:frame['Roi.X2'][i]]
-        cv2.imwrite(path,x)
-        print(i)
-
-
+#training data production function using hog feature
 def produce_training_data(ppcs,edge_length,traffic_sign_directory,total_class_number):
     TOTAL_CLASS_NUMBER=total_class_number
     for ppc in ppcs:
@@ -74,7 +49,7 @@ def produce_training_data(ppcs,edge_length,traffic_sign_directory,total_class_nu
         #saving
         np.save(saving_path,hogFeature)
 
-
+#test data production function using hog feature
 def produce_test_data(ppcs,edge_length,traffic_sign_directory):
     test_gt=pd.read_csv(traffic_sign_directory+'/Test.csv')
     for ppc in ppcs:
@@ -102,7 +77,8 @@ def produce_test_data(ppcs,edge_length,traffic_sign_directory):
         saving_path=folder_path+"/test_data_%d"%ppc+".npy"
         #saving
         np.save(saving_path,hogFeature)
-        
+
+#training and test function using hog feature
 def function(method_name,ppcs,total_class_number,alpha_or_c,traffic_sign_directory):
     if(alpha_or_c==None):
         alpha_or_c=1
@@ -195,22 +171,9 @@ def function(method_name,ppcs,total_class_number,alpha_or_c,traffic_sign_directo
         millis2 = int(round(time.time() * 1000))
         print('Prediction time in second: ',(millis2-millis1)/1000)
         prediction_time_list.append((millis2-millis1)/1000)
-        
-        
-        
-        
-        #millis2 = int(round(time.time() * 1000))
-        #print('Training time in ms: ',(millis2-millis1)/1000)
-        #training_time_list.append((millis2-millis1)/1000)
         training_accuracy = accuracy_score(training_pred,training_real)
-        #training_pred=clf.predict(x_training)
-        #training_real=y_training
-        #print('Training accuracy {}'.format(a))
         training_acc_list.append(training_accuracy)
         test_accuracy = accuracy_score(test_pred,test_real)
-        #test_pred=clf.predict(x_test)
-        #test_real=y_test
-        #print('Test accuracy {}'.format(a))
         test_acc_list.append(test_accuracy)
         
         training_correct_number=total_class_number*[0]
@@ -262,7 +225,6 @@ def function(method_name,ppcs,total_class_number,alpha_or_c,traffic_sign_directo
         test_total=test_total.reshape((-1,1))
         test_correct_rate=np.array(test_correct_rate)
         test_correct_rate=test_correct_rate.reshape((-1,1))
-        import pandas as pd
         print('accuracy by class')
         df = pd.DataFrame(data=np.concatenate([training_correct_number,training_false_number,training_total,
                                                training_correct_rate,test_correct_number,test_false_number,
@@ -335,28 +297,9 @@ def function(method_name,ppcs,total_class_number,alpha_or_c,traffic_sign_directo
     plt.legend(['Training', 'Prediction'], loc='upper right')
     plt.show()
 
-def preprocess_img(img,edge_length):
-    # Histogram normalization in v channel
-    hsv = color.rgb2hsv(img)
-    hsv[:, :, 2] = exposure.equalize_hist(hsv[:, :, 2])
-    img = color.hsv2rgb(hsv)
-    
-    # central square crop
-    min_side = min(img.shape[:-1])
-    centre = img.shape[0] // 2, img.shape[1] // 2
-    img = img[centre[0] - min_side // 2:centre[0] + min_side // 2,
-              centre[1] - min_side // 2:centre[1] + min_side // 2,
-              :]
-    
-    # rescale to standard size
-    #img = transform.resize(img, (edge_length, edge_length))
-    #img=img.reshape((edge_length, edge_length,3))
-    # roll color axis to axis 0
-    #img = np.rollaxis(img, -1)
-    #print(img.shape)
-    return img
 
-def cnn_produce_data(traffic_sign_directory,edge_length,total_class_number,transfer_learning=False,LSTM=False):
+#cnn data production function
+def cnn_produce_data(traffic_sign_directory,edge_length,total_class_number):
     data=[]
     labels=[]
 
@@ -366,69 +309,15 @@ def cnn_produce_data(traffic_sign_directory,edge_length,total_class_number,trans
         for a in Class:
             image=cv2.imread(path+a)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            #image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            #image=image.reshape(image.shape[0],image.shape[1],1)
-            #image=preprocess_img(image,edge_length)
             image=transform.resize(image, (edge_length, edge_length))
-            #image = exposure.equalize_adapthist(image, clip_limit=0.1)
-            #image/=255
-            #image = cv2.resize(image, (edge_length, edge_length))
-            #image=image/255
-            #image = img_to_array(image)
-            #image = exposure.equalize_adapthist(image, clip_limit=0.1)
-            #image=image.reshape((edge_length,edge_length,3))
-            #image_from_array = Image.fromarray(image, 'RGB')
-            #size_image = image_from_array.resize((edge_length, edge_length))
             data.append(np.array(image))
             labels.append(i)
-            
-            # image=cv2.imread(path+a)
-            # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            # #image=preprocess_img(image,edge_length)
-            # image=cv2.blur(image,(5,5))
-            # image=transform.resize(image, (edge_length, edge_length))
-            # #image_from_array = Image.fromarray(image, 'RGB')
-            # #size_image = image_from_array.resize((edge_length, edge_length))
-            # data.append(np.array(image))
-            # labels.append(i)
-            
-            
-            # image=cv2.imread(path+a)
-            # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            # #image=preprocess_img(image,edge_length)
-            # image = cv2.rotate(image, cv2.ROTATE_180)
-            # image=transform.resize(image, (edge_length, edge_length))
-            # #image_from_array = Image.fromarray(image, 'RGB')
-            # #size_image = image_from_array.resize((edge_length, edge_length))
-            # data.append(np.array(image))
-            # labels.append(i)
-            
-            # image=cv2.imread(path+a)
-            # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            # #image=preprocess_img(image,edge_length)
-            # image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
-            # image=transform.resize(image, (edge_length, edge_length))
-            # #image_from_array = Image.fromarray(image, 'RGB')
-            # #size_image = image_from_array.resize((edge_length, edge_length))
-            # data.append(np.array(image))
-            # labels.append(i)
-            
-            # image=cv2.imread(path+a)
-            # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            # #image=preprocess_img(image,edge_length)
-            # image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
-            # image=transform.resize(image, (edge_length, edge_length))
-            # #image_from_array = Image.fromarray(image, 'RGB')
-            # #size_image = image_from_array.resize((edge_length, edge_length))
-            # data.append(np.array(image))
-            # labels.append(i)
 
 
     x_training=np.array(data)
     labels=np.array(labels)
 
 
-    #x_training = x_training.astype('float32')/255 
     y_training=labels
     
     validation_size=0.25
@@ -450,131 +339,30 @@ def cnn_produce_data(traffic_sign_directory,edge_length,total_class_number,trans
     for f in labels:
         image=cv2.imread(traffic_sign_directory+'/Test/'+f.replace('Test/', ''))
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        #image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        #image=image.reshape(image.shape[0],image.shape[1],1)
-        #image=preprocess_img(image,edge_length)
         image=transform.resize(image, (edge_length, edge_length))
-        #image = exposure.equalize_adapthist(image, clip_limit=0.1)
-        #image/=255
-        #image = cv2.resize(image, (edge_length, edge_length))
-        #image=image/255
-        #image = img_to_array(image)
-        #image = exposure.equalize_adapthist(image, clip_limit=0.1)
-        #image=preprocess_img(image,edge_length)
-        #image=image.reshape((edge_length,edge_length,3))
-        #image_from_array = Image.fromarray(image, 'RGB')
-        #size_image = image_from_array.resize((edge_length, edge_length))
         data.append(np.array(image))
 
     x_test=np.array(data)
-    #x_test = x_test.astype('float32')/255 
-    if(LSTM==True):
-        x_training=x_training.reshape((x_training.shape[0],1,x_training.shape[1],x_training.shape[2],x_training.shape[3]))
-        x_val=x_val.reshape((x_val.shape[0],1,x_val.shape[1],x_val.shape[2],x_val.shape[3]))
-        x_test=x_test.reshape((x_test.shape[0],1,x_test.shape[1],x_test.shape[2],x_test.shape[3]))
+    
+
     return (x_training,x_val,x_test,y_training,y_val,y_test)
 
-
-def cnn(model,edge_length,epochs,total_class_number,traffic_sign_directory,model_number,transfer_learning=False,training_val_test_data=None,class_weight=None):
-    # Reading the input images and putting them into a numpy array
+#training and test function using cnn
+def cnn(model,edge_length,epochs,total_class_number,traffic_sign_directory,model_number,training_val_test_data=None):
+    
     
     print('CNN')
     if(training_val_test_data== None):
-        x_training,x_val,x_test,y_training,y_val,y_test=cnn_produce_data(traffic_sign_directory,edge_length,total_class_number,transfer_learning=False)
+        x_training,x_val,x_test,y_training,y_val,y_test=cnn_produce_data(traffic_sign_directory,edge_length,total_class_number)
     else:
         x_training,x_val,x_test,y_training,y_val,y_test=training_val_test_data[0],training_val_test_data[1],training_val_test_data[2],training_val_test_data[3],training_val_test_data[4],training_val_test_data[5]
 
 
-#    data=[]
-#    labels=[]
-#
-#    
-#    for i in range(total_class_number) :
-#        path=traffic_sign_directory+'/Train/{}/'.format(i)
-#        Class=os.listdir(path)
-#        for a in Class:
-#            image=cv2.imread(path+a)
-#            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-#            #image=preprocess_img(image,edge_length)
-#            image=transform.resize(image, (edge_length, edge_length))
-#            #image = exposure.equalize_adapthist(image, clip_limit=0.1)
-#            #image=image.reshape((edge_length,edge_length,3))
-#            #image_from_array = Image.fromarray(image, 'RGB')
-#            #size_image = image_from_array.resize((edge_length, edge_length))
-#            data.append(np.array(image))
-#            labels.append(i)
-#            
-##            image=cv2.imread(path+a)
-##            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-##            #image=preprocess_img(image,edge_length)
-##            image=cv2.blur(image,(5,5))
-##            image=transform.resize(image, (edge_length, edge_length))
-##            #image_from_array = Image.fromarray(image, 'RGB')
-##            #size_image = image_from_array.resize((edge_length, edge_length))
-##            data.append(np.array(image))
-##            labels.append(i)
-##            
-##            
-##            image=cv2.imread(path+a)
-##            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-##            #image=preprocess_img(image,edge_length)
-##            image = cv2.rotate(image, cv2.ROTATE_180)
-##            image=transform.resize(image, (edge_length, edge_length))
-##            #image_from_array = Image.fromarray(image, 'RGB')
-##            #size_image = image_from_array.resize((edge_length, edge_length))
-##            data.append(np.array(image))
-##            labels.append(i)
-##            
-##            image=cv2.imread(path+a)
-##            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-##            #image=preprocess_img(image,edge_length)
-##            image = cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE)
-##            image=transform.resize(image, (edge_length, edge_length))
-##            #image_from_array = Image.fromarray(image, 'RGB')
-##            #size_image = image_from_array.resize((edge_length, edge_length))
-##            data.append(np.array(image))
-##            labels.append(i)
-##            
-##            image=cv2.imread(path+a)
-##            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-##            #image=preprocess_img(image,edge_length)
-##            image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
-##            image=transform.resize(image, (edge_length, edge_length))
-##            #image_from_array = Image.fromarray(image, 'RGB')
-##            #size_image = image_from_array.resize((edge_length, edge_length))
-##            data.append(np.array(image))
-##            labels.append(i)
-#
-#
-#    x_training=np.array(data)
-#    labels=np.array(labels)
-#
-#
-#    #x_training = x_training.astype('float32')/255 
-#    y_training=labels
-#    
-#    validation_size=0.25
-#    if(validation_size<1):
-#        x_training, x_val, y_training, y_val= train_test_split(x_training,y_training,stratify=y_training,test_size=validation_size,random_state=42)
-#        
-#
-#    #Using one hote encoding for the train and validation labels
-#    y_training = to_categorical(y_training, total_class_number)
-#    y_val = to_categorical(y_val, total_class_number)
+
     
         
     millis1 = int(round(time.time() * 1000))
-    #datagen = ImageDataGenerator(width_shift_range=0.1, height_shift_range=0.1,horizontal_flip=True)
-    #it_train = datagen.flow(x_training, y_training, batch_size=64)
-    #steps = int(x_training.shape[0] / 32)
-    #history = model.fit_generator(it_train, steps_per_epoch=steps, epochs=epochs,validation_data=(x_val,y_val))
-
-    if(class_weight):
-        history = model.fit(x_training, y_training, batch_size=32, epochs=epochs,validation_data=(x_val, y_val),class_weight=class_weight)
-    else:
-        history = model.fit(x_training, y_training, batch_size=32, epochs=epochs,validation_data=(x_val, y_val))
-        
-    
+    history = model.fit(x_training, y_training, batch_size=32, epochs=epochs,validation_data=(x_val, y_val))
     millis2 = int(round(time.time() * 1000))
     print('Training time in second: ',(millis2-millis1)/1000)
     
@@ -600,42 +388,13 @@ def cnn(model,edge_length,epochs,total_class_number,traffic_sign_directory,model
     y_val_decoded=np.array(y_val_decoded)
     
     
-#    y_test=pd.read_csv(traffic_sign_directory+'/Test.csv')
-#    labels=y_test['Path'].as_matrix()
-#    y_test=y_test['ClassId'].values
-#
-#    data=[]
-#
-#    for f in labels:
-#        image=cv2.imread(traffic_sign_directory+'/Test/'+f.replace('Test/', ''))
-#        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-#        #image=preprocess_img(image,edge_length)
-#        image=transform.resize(image, (edge_length, edge_length))
-#        #image = exposure.equalize_adapthist(image, clip_limit=0.1)
-#        #image=preprocess_img(image,edge_length)
-#        #image=image.reshape((edge_length,edge_length,3))
-#        #image_from_array = Image.fromarray(image, 'RGB')
-#        #size_image = image_from_array.resize((edge_length, edge_length))
-#        data.append(np.array(image))
-#
-#    x_test=np.array(data)
-#    #x_test = x_test.astype('float32')/255 
-
 
 
     millis1 = int(round(time.time() * 1000))
     
-    if(transfer_learning==False):
-        y_training_predicted=model.predict_classes(x_training)
-        y_val_predicted=model.predict_classes(x_val)
-        y_test_predicted = model.predict_classes(x_test)
-    else:
-        y_training_predicted=np.argmax(model.predict(x_training),axis=1)
-        y_val_predicted=np.argmax(model.predict(x_val),axis=1)
-        y_test_predicted = np.argmax(model.predict(x_test),axis=1)
-        
-
-
+    y_training_predicted=model.predict_classes(x_training)
+    y_val_predicted=model.predict_classes(x_val)
+    y_test_predicted = model.predict_classes(x_test)
 
     millis2 = int(round(time.time() * 1000))
     print('Prediction time in second: ',(millis2-millis1)/1000)
@@ -814,16 +573,6 @@ def cnn(model,edge_length,epochs,total_class_number,traffic_sign_directory,model
     y1=df['training_correct_rate']
     y2=df['val_correct_rate']
     y3=df['test_correct_rate']
-#    fig = plt.figure(figsize=(20, 8))
-#    fig.add_subplot(121)
-#    plt.plot(x,y1,'ko-')
-#    plt.plot(x,y2,'bo-',alpha=0.5)
-#    plt.plot(x,y3,'ro-',alpha=0.5)
-#    plt.xticks(np.arange(min(x), max(x), 5))
-#    plt.xlabel('class')
-#    plt.ylabel('accuracy')
-#    plt.title('accuracy by class')
-#    plt.legend(['Training', 'Val','Test'], loc='upper right')
 
 
     #fig.add_subplot(122)
@@ -843,191 +592,3 @@ def cnn(model,edge_length,epochs,total_class_number,traffic_sign_directory,model
     
     return accuracy_score(y_training_decoded, y_training_predicted), accuracy_score(y_val_decoded, y_val_predicted), accuracy_score(y_test, y_test_predicted),y2,data[0]
     
-def cnn_transfer_learning(model,edge_length,epochs,total_class_number,traffic_sign_directory):
-    # Reading the input images and putting them into a numpy array
-    data=[]
-    labels=[]
-
-    print('CNN')
-
-    for i in range(total_class_number) :
-        path=traffic_sign_directory+'/Train/{}/'.format(i)
-        Class=os.listdir(path)
-        for a in Class:
-            image=cv2.imread(path+a)
-            image_from_array = Image.fromarray(image, 'RGB')
-            size_image = image_from_array.resize((edge_length, edge_length))
-            data.append(np.array(size_image))
-            labels.append(i)
-            
-            
-
-
-
-    x_training=np.array(data)
-    labels=np.array(labels)
-
-
-    x_training = x_training.astype('float32')/255 
-    y_training=labels
-
-    #Using one hote encoding for the train and validation labels
-    y_training = to_categorical(y_training, total_class_number)
-
-
-    millis1 = int(round(time.time() * 1000))
-    history = model.fit(x_training, y_training, batch_size=32, epochs=epochs)
-    millis2 = int(round(time.time() * 1000))
-    print('Training time in second: ',(millis2-millis1)/1000)
-
-
-
-    y_training_decoded=[]
-
-    for i in range(len(y_training)):
-        y_training_decoded.append(np.argmax(y_training[i]))
-
-    y_training_decoded=np.array(y_training_decoded)
-    y_test=pd.read_csv(traffic_sign_directory+'/Test.csv')
-    labels=y_test['Path'].as_matrix()
-    y_test=y_test['ClassId'].values
-
-    data=[]
-
-    for f in labels:
-        image=cv2.imread(traffic_sign_directory+'/Test/'+f.replace('Test/', ''))
-        image_from_array = Image.fromarray(image, 'RGB')
-        size_image = image_from_array.resize((edge_length, edge_length))
-        data.append(np.array(size_image))
-
-    x_test=np.array(data)
-    x_test = x_test.astype('float32')/255 
-
-
-
-    millis1 = int(round(time.time() * 1000))
-    y_training_predicted=model.predict_classes(x_training)
-    y_test_predicted = model.predict_classes(x_test)
-
-
-
-    millis2 = int(round(time.time() * 1000))
-    print('Prediction time in second: ',(millis2-millis1)/1000)
-
-
-
-    training_pred=y_training_predicted
-    training_real=y_training_decoded
-    test_pred=y_test_predicted
-    test_real=y_test
-
-
-
-
-    training_correct_number=total_class_number*[0]
-    training_false_number=total_class_number*[0]
-    for i in range(0,total_class_number):
-        for j in range(len(training_pred)):
-            if(training_real[j]==i and training_pred[j]==training_real[j]):
-                training_correct_number[i]+=1
-            elif(training_real[j]==i and training_pred[j]!=training_real[j]):
-                training_false_number[i]+=1
-    training_correct_rate=[]
-    training_total=[]
-    for i in range(0,total_class_number):
-        training_total.append(training_correct_number[i]+training_false_number[i])
-        training_correct_rate.append(training_correct_number[i]/(training_correct_number[i]+training_false_number[i]))
-
-
-    test_correct_number=total_class_number*[0]
-    test_false_number=total_class_number*[0]
-    for i in range(0,total_class_number):
-        for j in range(len(test_pred)):
-            if(test_real[j]==i and test_pred[j]==test_real[j]):
-                test_correct_number[i]+=1
-            elif(test_real[j]==i and test_pred[j]!=test_real[j]):
-                test_false_number[i]+=1
-    test_correct_rate=[]
-    test_total=[]
-    for i in range(0,total_class_number):
-        test_total.append(test_correct_number[i]+test_false_number[i])
-        if((test_correct_number[i]+test_false_number[i])>0):
-            test_correct_rate.append(test_correct_number[i]/(test_correct_number[i]+test_false_number[i]))
-        else:
-            test_correct_rate.append(0)
-        
-    training_correct_number=np.array(training_correct_number)
-    training_correct_number=training_correct_number.reshape((-1,1))
-    training_false_number=np.array(training_false_number)
-    training_false_number=training_false_number.reshape((-1,1))
-    training_total=np.array(training_total)
-    training_total=training_total.reshape((-1,1))
-    training_correct_rate=np.array(training_correct_rate)
-    training_correct_rate=training_correct_rate.reshape((-1,1))
-
-    test_correct_number=np.array(test_correct_number)
-    test_correct_number=test_correct_number.reshape((-1,1))
-    test_false_number=np.array(test_false_number)
-    test_false_number=test_false_number.reshape((-1,1))
-    test_total=np.array(test_total)
-    test_total=test_total.reshape((-1,1))
-    test_correct_rate=np.array(test_correct_rate)
-    test_correct_rate=test_correct_rate.reshape((-1,1))
-
-    print('accuracy by class')
-    df = pd.DataFrame(data=np.concatenate([training_correct_number,training_false_number,training_total,
-                                           training_correct_rate,test_correct_number,test_false_number,
-                                           test_total,test_correct_rate],axis=1), 
-                      index=range(0,total_class_number), columns=["training_correct", "training_false", "training_total",
-                                                  "training_correct_rate","test_correct",
-                                                  "test_false", "test_total",
-                                                  "test_correct_rate"])
-
-
-    print(df)
-
-
-    print('CNN')
-    print('Training accuracy {}'.format(accuracy_score(y_training_decoded, y_training_predicted)))
-    print('Test accuracy {}'.format(accuracy_score(y_test, y_test_predicted)))
-    print('Training accuracy mean ',df['training_correct_rate'].mean())
-    print('Test accuracy mean ',df['test_correct_rate'].mean())
-
-
-    training_labels=y_training_decoded
-    training_labels_number=[]
-    for i in range(0,total_class_number):
-        training_labels_number.append((training_labels==i).sum())
-    test_labels=y_test
-    test_labels_number=[]
-    for i in range(0,total_class_number):
-        test_labels_number.append((test_labels==i).sum())
-
-
-
-    x=range(0,total_class_number)
-    y1=df['training_correct_rate']
-    y2=df['test_correct_rate']
-    fig = plt.figure(figsize=(20, 8))
-    fig.add_subplot(121)
-    plt.plot(x,y1,'ko-')
-    plt.plot(x,y2,'ro-')
-    plt.xticks(np.arange(min(x), max(x), 5))
-    plt.xlabel('class')
-    plt.ylabel('accuracy')
-    plt.title('accuracy by class')
-    plt.legend(['Training', 'Test'], loc='upper right')
-
-
-    fig.add_subplot(122)
-    data = [training_labels_number,test_labels_number]
-    X = np.arange(0,total_class_number)
-    plt.bar(X + 0.00, data[0], color = 'k', width = 0.25)
-    plt.bar(X + 0.25, data[1], color = 'r', width = 0.25)
-    plt.legend(labels=['Training', 'Test'])
-    plt.xticks(np.arange(0, total_class_number, 5))
-    plt.yticks(np.arange(0, max(training_labels_number), 250))
-    plt.xlabel('class')
-    plt.ylabel('frequency')
-    plt.title('class number distribution plot')
-    plt.show()

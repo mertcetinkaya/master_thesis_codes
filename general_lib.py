@@ -1,14 +1,9 @@
-import numpy as np
-from os import listdir,makedirs
-from os.path import isfile, join, exists
 import cv2
-from skimage import exposure, feature, transform
-import matplotlib.pyplot as plt
-import time
+from skimage import feature, transform
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPool2D, Dense, Flatten, Dropout
 
-
+#function for producing hog feature
 def get_hog_feature(image_path,ppc,edge_length):
     im=cv2.imread(image_path)
     grayim = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
@@ -17,6 +12,7 @@ def get_hog_feature(image_path,ppc,edge_length):
     cells_per_block=(2, 2), transform_sqrt=True, visualize=True, block_norm="L1")
     return hogFeature
 
+#function for producing different cnn architectures, ready for being trained
 def produce_basic_cnn_list(edge_length,kernel_list,neuron_list,class_number):
     models=[]
     for i in kernel_list:
