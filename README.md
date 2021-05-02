@@ -8,6 +8,6 @@ Breast Cancer Recognition dataset can be downloaded via the link http://www.andr
 
 For Optical Character Recognition (OCR) customized data files are used. They are given in OCR_data folder.
 
-For your questions, you can reach me via github.
+For your questions, you can reach me via mail.
 
 Mert Çetinkaya
