@@ -1,1 +1,1 @@
-Some OCR image files are given. The folder hierarchy given in the thesis must be set to run the codes properly.
+Some OCR image files are given. The folder hierarchy given in the thesis must be set to run the codes properly. The files containing the expression 'training' are the alphabet images to use in training and the other files are sample test images.
